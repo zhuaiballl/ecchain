@@ -8,6 +8,11 @@ GOBIN = ./build/bin
 GO ?= latest
 GORUN = env GO111MODULE=on go run
 
+ec:
+	$(GORUN) build/ci.go install ./cmd/ecchain
+	@echo "Done building."
+	@echo "Run \"$(GOBIN)/ecchain\" to launch geth."
+
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
 	@echo "Done building."

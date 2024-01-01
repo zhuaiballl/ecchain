@@ -71,6 +71,7 @@ var (
 		"COPYING",
 		executablePath("abigen"),
 		executablePath("bootnode"),
+		executablePath("ecchain"),
 		executablePath("evm"),
 		executablePath("geth"),
 		executablePath("rlpdump"),
@@ -86,6 +87,10 @@ var (
 		{
 			BinaryName:  "bootnode",
 			Description: "Ethereum bootnode.",
+		},
+		{
+			BinaryName:  "ecchain",
+			Description: "EC-Chain Implement",
 		},
 		{
 			BinaryName:  "evm",
