@@ -22,6 +22,7 @@ func init() {
 	app.Copyright = "Copyright 2013-2023 The go-ethereum Authors"
 	app.Commands = []*cli.Command{
 		readtxcmd,
+		executetxcmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 
