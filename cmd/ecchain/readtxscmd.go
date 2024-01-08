@@ -19,6 +19,7 @@ import (
 	"io"
 	"math/big"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -117,13 +118,15 @@ func executeTxs(s *state.StateDB, t *trie.Trie, records [][]string) error {
 		//maxFeePerGas := ToInt(record[16])
 		//maxPriorityFeePerGas := ToInt(record[17])
 
-		s.SubBalance(common.HexToAddress(sender), value)
+		s.AddBalance(common.HexToAddress(sender), big.NewInt(1))
 		s.AddBalance(common.HexToAddress(to), value)
-		root, err := s.Commit(false)
-		if err != nil {
-			return err
+		if i%10000 == 0 || i == len(records)-1 {
+			root, err := s.Commit(false)
+			if err != nil {
+				return err
+			}
+			fmt.Println(i, root)
 		}
-		fmt.Println(i, root)
 	}
 	return nil
 }
@@ -136,15 +139,11 @@ func executeTxFromZip(ctx *cli.Context) error {
 		return err
 	}
 
-	// Instantiate an empty MPT
-	db := trie.NewDatabase(nil)
-	mpt, err := trie.New(trie.TrieID(common.Hash{}), db)
+	datadir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return err
 	}
-
-	// Initialize the state
-	datadir, _ := os.MkdirTemp("", "")
+	fmt.Println(datadir)
 	config := &node.Config{
 		Name:    "geth",
 		Version: params.Version,
@@ -186,12 +185,22 @@ func executeTxFromZip(ctx *cli.Context) error {
 		LightNoSyncServe: true,
 	}
 	chainDb, err := stack.OpenDatabaseWithFreezer("chaindata", econfig.DatabaseCache, econfig.DatabaseHandles, econfig.DatabaseFreezer, "eth/db/chaindata/", false)
+	db := trie.NewDatabase(chainDb)
 	stateDB, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(chainDb, db), nil)
+
+	mpt, err := trie.New(trie.TrieID(common.Hash{}), db)
+	if err != nil {
+		return err
+	}
 
 	err = executeTxs(stateDB, mpt, records)
 	if err != nil {
 		return err
 	}
+
+	// measure storage cost
+	storageCost, _ := exec.Command("du", "-sh", datadir).Output()
+	fmt.Println(string(storageCost))
 	return nil
 }
 
