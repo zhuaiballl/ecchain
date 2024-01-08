@@ -17,7 +17,10 @@ type ecGroup struct {
 }
 
 func NewEcGroup(n int) ecGroup {
-
+	return ecGroup{
+		n:      0,
+		dbList: nil,
+	}
 }
 
 type payload struct {
