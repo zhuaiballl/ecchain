@@ -5,12 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/txpool"
-	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/eth/ethconfig"
-	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
@@ -22,7 +17,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 var (
@@ -37,15 +31,14 @@ var (
 	executetxcmd = &cli.Command{
 		Name:        "executetx",
 		Usage:       "Execute transactions from zip",
-		Action:      executeTxFromZip,
+		Action:      executeTxFromZipCmd,
 		ArgsUsage:   "",
 		Description: "ecchain execute /path/to/my.zip",
 	}
 )
 
-func readTxFromZip(files ...string) ([][]string, error) {
-	var records [][]string
-
+func processTxFromZip(f func(int, []string) error, files ...string) error {
+	cntLine := 0
 	for _, file := range files {
 		fmt.Println(file)
 		fileName := filepath.Base(file)
@@ -57,13 +50,13 @@ func readTxFromZip(files ...string) ([][]string, error) {
 		zipFilePath := file
 		theZIP, err := zip.OpenReader(zipFilePath)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer theZIP.Close()
 
 		theCSVFile, err := theZIP.Open(fileName + ".csv")
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer theCSVFile.Close()
 
@@ -75,77 +68,68 @@ func readTxFromZip(files ...string) ([][]string, error) {
 			if err == io.EOF {
 				break
 			} else if err != nil {
-				return nil, err
+				return err
 			}
-			records = append(records, oneLine[:18])
+			cntLine++
+			err = f(cntLine, oneLine[:18])
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return records, nil
+	return nil
 }
 
 func readTxFromZipCmd(ctx *cli.Context) error {
 	files := ctx.Args().Slice()
-	records, err := readTxFromZip(files...)
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		fmt.Println(record)
-	}
-	return nil
+	return processTxFromZip(func(i int, strings []string) error {
+		fmt.Println(i, strings)
+		return nil
+	}, files...)
 }
 
-func executeTxs(s *state.StateDB, t *trie.Trie, records [][]string) error {
-	for i, record := range records {
-		// Parse transaction data from record
-		//blockNumber := ToInt(record[0])
-		//timestamp := ToInt(record[1])
-		//transactionHash := record[2]
-		sender := record[3]
-		to := record[4]
-		//toCreate := record[5]
-		//fromIsContract := record[6]
-		//toIsContract := record[7]
-		value := new(big.Int)
-		value.SetString(record[8], 10)
-		//gasLimit := ToInt(record[9])
-		//gasPrice := ToInt(record[10])
-		//gasUsed := ToInt(record[11])
-		//callingFunction := record[12]
-		//isError := record[13]
-		//eip2718type := ToInt(record[14])
-		//baseFeePerGas := ToInt(record[15])
-		//maxFeePerGas := ToInt(record[16])
-		//maxPriorityFeePerGas := ToInt(record[17])
+func executeTx(s *state.StateDB, ind int, record []string) error {
+	// Parse transaction data from record
+	//blockNumber := ToInt(record[0])
+	//timestamp := ToInt(record[1])
+	//transactionHash := record[2]
+	sender := record[3]
+	to := record[4]
+	//toCreate := record[5]
+	//fromIsContract := record[6]
+	//toIsContract := record[7]
+	value := new(big.Int)
+	value.SetString(record[8], 10)
+	//gasLimit := ToInt(record[9])
+	//gasPrice := ToInt(record[10])
+	//gasUsed := ToInt(record[11])
+	//callingFunction := record[12]
+	//isError := record[13]
+	//eip2718type := ToInt(record[14])
+	//baseFeePerGas := ToInt(record[15])
+	//maxFeePerGas := ToInt(record[16])
+	//maxPriorityFeePerGas := ToInt(record[17])
 
-		s.AddBalance(common.HexToAddress(sender), big.NewInt(1))
-		s.AddBalance(common.HexToAddress(to), value)
-		if i%10000 == 0 || i == len(records)-1 {
-			root, err := s.Commit(false)
-			if err != nil {
-				return err
-			}
-			fmt.Println(i, root)
+	s.AddBalance(common.HexToAddress(sender), big.NewInt(1))
+	s.AddBalance(common.HexToAddress(to), value)
+	if ind%10000 == 0 {
+		root, err := s.Commit(true)
+		if err != nil {
+			return err
 		}
+		fmt.Println(ind, root)
 	}
 	return nil
 }
 
-func executeTxFromZip(ctx *cli.Context) error {
-	// read transactions from zip files
-	files := ctx.Args().Slice()
-	records, err := readTxFromZip(files...)
+func prepareDatabase() (*state.StateDB, string, error) {
+	datadir, err := os.MkdirTemp("", "ecchain")
 	if err != nil {
-		return err
-	}
-
-	datadir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return err
+		return nil, "", err
 	}
 	fmt.Println(datadir)
-	config := &node.Config{
-		Name:    "geth",
+	nodeConfig := &node.Config{
+		Name:    "geth-ec",
 		Version: params.Version,
 		DataDir: datadir,
 		P2P: p2p.Config{
@@ -155,52 +139,44 @@ func executeTxFromZip(ctx *cli.Context) error {
 		},
 		UseLightweightKDF: true,
 	}
-	stack, err := node.New(config)
-	genesis := core.DefaultGenesisBlock()
-	genesis.Difficulty = params.MinimumDifficulty
-	genesis.GasLimit = 25000000
+	tempNode, err := node.New(nodeConfig)
 
-	genesis.BaseFee = big.NewInt(params.InitialBaseFee)
-	genesis.Config = params.AllEthashProtocolChanges
-	genesis.Config.TerminalTotalDifficulty = new(big.Int).Mul(big.NewInt(20), params.MinimumDifficulty)
-
-	genesis.Alloc = core.GenesisAlloc{}
-	econfig := &ethconfig.Config{
-		Genesis:         genesis,
-		NetworkId:       genesis.Config.ChainID.Uint64(),
-		SyncMode:        downloader.FullSync,
-		DatabaseCache:   256,
-		DatabaseHandles: 256,
-		TxPool:          txpool.DefaultConfig,
-		GPO:             ethconfig.Defaults.GPO,
-		Ethash:          ethconfig.Defaults.Ethash,
-		Miner: miner.Config{
-			GasFloor: genesis.GasLimit * 9 / 10,
-			GasCeil:  genesis.GasLimit * 11 / 10,
-			GasPrice: big.NewInt(1),
-			Recommit: 1 * time.Second,
-		},
-		LightServ:        100,
-		LightPeers:       10,
-		LightNoSyncServe: true,
-	}
-	chainDb, err := stack.OpenDatabaseWithFreezer("chaindata", econfig.DatabaseCache, econfig.DatabaseHandles, econfig.DatabaseFreezer, "eth/db/chaindata/", false)
+	chainDb, err := tempNode.OpenDatabaseWithFreezer("babadata", 256, 256, "", "eth/db/chaindata/", false)
 	db := trie.NewDatabase(chainDb)
 	stateDB, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(chainDb, db), nil)
 
-	mpt, err := trie.New(trie.TrieID(common.Hash{}), db)
+	//mpt, err := trie.New(trie.TrieID(common.Hash{}), db)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	err = executeTxs(stateDB, mpt, records)
-	if err != nil {
-		return err
-	}
+	return stateDB, datadir, nil
+}
+
+func executeTxFromZipCmd(ctx *cli.Context) error {
+	// read transactions from zip files
+	files := ctx.Args().Slice()
+
+	stateDB, datadir, err := prepareDatabase()
+
+	err = processTxFromZip(func(ind int, strings []string) error {
+		return executeTx(stateDB, ind, strings)
+	}, files...)
 
 	// measure storage cost
+	if err != nil {
+		return err
+	}
+	fmt.Println(datadir)
 	storageCost, _ := exec.Command("du", "-sh", datadir).Output()
 	fmt.Println(string(storageCost))
+
+	if ctx.Bool("clean") {
+		err = os.RemoveAll(datadir)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
