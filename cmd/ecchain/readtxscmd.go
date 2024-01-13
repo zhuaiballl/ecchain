@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
@@ -17,6 +18,57 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+)
+
+var zips []string = []string{
+	"0to999999",
+	"1000000to1999999",
+	"2000000to2999999",
+	"3000000to3999999",
+	"4000000to4999999",
+	"5000000to5999999",
+	"6000000to6999999",
+	"7000000to7999999",
+	"8000000to8999999",
+	"9000000to9999999",
+	"10000000to10999999",
+	"11000000to11999999",
+	"12000000to12999999",
+	"13000000to13249999",
+	"13250000to13499999",
+	"13500000to13749999",
+	"13750000to13999999",
+	"14000000to14249999",
+	"14250000to14499999",
+	"14500000to14749999",
+	"14750000to14999999",
+	"15000000to15249999",
+	"15250000to15499999",
+	"15500000to15749999",
+	"15750000to15999999",
+	"16000000to16249999",
+	"16250000to16499999",
+	"16500000to16749999",
+	"16750000to16999999",
+	"17000000to17249999",
+	"17250000to17499999",
+	"17750000to17999999",
+	"18000000to18249999",
+	"18250000to18499999",
+}
+
+var datadir string
+
+var (
+	cleanFlag *cli.BoolFlag = &cli.BoolFlag{
+		Name:  "clean",
+		Usage: "Remove the temp folder after run",
+	}
+	zipDirFlag *cli.StringFlag = &cli.StringFlag{
+		Name:  "zipdir",
+		Usage: "Directory of zip files",
+	}
 )
 
 var (
@@ -29,18 +81,45 @@ var (
     ecchain readtx /path/to/my.zip`,
 	}
 	executetxcmd = &cli.Command{
-		Name:        "executetx",
-		Usage:       "Execute transactions from zip",
-		Action:      executeTxFromZipCmd,
+		Name:   "executetx",
+		Usage:  "Execute transactions from zip",
+		Action: executeTxFromZipCmd,
+		Flags: []cli.Flag{
+			cleanFlag,
+			zipDirFlag,
+		},
 		ArgsUsage:   "",
 		Description: "ecchain execute /path/to/my.zip",
 	}
 )
 
-func processTxFromZip(f func(int, []string) error, files ...string) error {
+type txFromZip struct {
+	txNumber             int
+	blockNumber          int
+	timestamp            int
+	transactionHash      string
+	sender               string
+	to                   string
+	toCreate             string
+	fromIsContract       string
+	toIsContract         string
+	value                *big.Int
+	gasLimit             int
+	gasPrice             int
+	gasUsed              int
+	callingFunction      string
+	isError              string
+	eip2718type          int
+	baseFeePerGas        int
+	maxFeePerGas         int
+	maxPriorityFeePerGas int
+}
+
+func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) error, files ...string) error {
 	cntLine := 0
+	lastBlockNumber := -1
 	for _, file := range files {
-		fmt.Println(file)
+		//fmt.Println(file)
 		fileName := filepath.Base(file)
 
 		// remove file name extension
@@ -64,14 +143,51 @@ func processTxFromZip(f func(int, []string) error, files ...string) error {
 		_, err = csvReader.Read() // Skip header row
 
 		for {
-			oneLine, err := csvReader.Read()
+			record, err := csvReader.Read()
 			if err == io.EOF {
 				break
 			} else if err != nil {
 				return err
 			}
+
 			cntLine++
-			err = f(cntLine, oneLine[:18])
+			// Parse transaction data from record
+			tx := txFromZip{
+				cntLine,
+				ToInt(record[0]),
+				ToInt(record[1]),
+				record[2],
+				record[3],
+				record[4],
+				record[5],
+				record[6],
+				record[7],
+				big.NewInt(1),
+				ToInt(record[9]),
+				ToInt(record[10]),
+				ToInt(record[11]),
+				record[12],
+				record[13],
+				ToInt(record[14]),
+				ToInt(record[15]),
+				ToInt(record[16]),
+				ToInt(record[17]),
+			}
+			tx.value.SetString(record[8], 10)
+
+			// If the previous block ends, run finishBlock
+			if lastBlockNumber != tx.blockNumber {
+				if lastBlockNumber != -1 {
+					err = finishBlock(lastBlockNumber)
+					if err != nil {
+						return err
+					}
+				}
+				lastBlockNumber = tx.blockNumber
+			}
+
+			// process tx
+			err = processTx(tx)
 			if err != nil {
 				return err
 			}
@@ -82,52 +198,47 @@ func processTxFromZip(f func(int, []string) error, files ...string) error {
 
 func readTxFromZipCmd(ctx *cli.Context) error {
 	files := ctx.Args().Slice()
-	return processTxFromZip(func(i int, strings []string) error {
-		fmt.Println(i, strings)
+	return processTxFromZip(nil, func(tx txFromZip) error {
+		fmt.Println(tx)
 		return nil
 	}, files...)
 }
 
-func executeTx(s *state.StateDB, ind int, record []string) error {
-	// Parse transaction data from record
-	//blockNumber := ToInt(record[0])
-	//timestamp := ToInt(record[1])
-	//transactionHash := record[2]
-	sender := record[3]
-	to := record[4]
-	//toCreate := record[5]
-	//fromIsContract := record[6]
-	//toIsContract := record[7]
-	value := new(big.Int)
-	value.SetString(record[8], 10)
-	//gasLimit := ToInt(record[9])
-	//gasPrice := ToInt(record[10])
-	//gasUsed := ToInt(record[11])
-	//callingFunction := record[12]
-	//isError := record[13]
-	//eip2718type := ToInt(record[14])
-	//baseFeePerGas := ToInt(record[15])
-	//maxFeePerGas := ToInt(record[16])
-	//maxPriorityFeePerGas := ToInt(record[17])
-
-	s.AddBalance(common.HexToAddress(sender), big.NewInt(1))
-	s.AddBalance(common.HexToAddress(to), value)
-	if ind%10000 == 0 {
-		root, err := s.Commit(true)
-		if err != nil {
-			return err
-		}
-		fmt.Println(ind, root)
-	}
+func executeTx(s *state.StateDB, t *trie.Database, tx txFromZip) error {
+	s.AddBalance(common.HexToAddress(tx.sender), big.NewInt(1))
+	s.AddBalance(common.HexToAddress(tx.to), tx.value)
 	return nil
 }
 
-func prepareDatabase() (*state.StateDB, string, error) {
-	datadir, err := os.MkdirTemp("", "ecchain")
+func finishBlock(s *state.StateDB, t *trie.Database, height int) error {
+	root, err := s.Commit(true)
 	if err != nil {
-		return nil, "", err
+		return err
 	}
-	fmt.Println(datadir)
+	err = t.Commit(root, false)
+	if err != nil {
+		return err
+	}
+
+	//fmt.Println("Block", height)
+
+	// measure storage cost of the database
+	//fmt.Println("datadir", datadir, "datadir")
+	cmdOutput, _ := exec.Command("du", "-s", datadir).Output()
+	storageCost := string(cmdOutput)
+	storageCost = strings.Fields(storageCost)[0]
+	fmt.Println(height, storageCost)
+
+	return nil
+}
+
+func prepareDatabase() (*state.StateDB, *trie.Database, error) {
+	var err error
+	datadir, err = os.MkdirTemp("", "ecchain")
+	if err != nil {
+		return nil, nil, err
+	}
+	//fmt.Println(datadir)
 	nodeConfig := &node.Config{
 		Name:    "geth-ec",
 		Version: params.Version,
@@ -142,36 +253,53 @@ func prepareDatabase() (*state.StateDB, string, error) {
 	tempNode, err := node.New(nodeConfig)
 
 	chainDb, err := tempNode.OpenDatabaseWithFreezer("babadata", 256, 256, "", "eth/db/chaindata/", false)
-	db := trie.NewDatabase(chainDb)
-	stateDB, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(chainDb, db), nil)
+	trieDb := trie.NewDatabase(chainDb)
 
-	//mpt, err := trie.New(trie.TrieID(common.Hash{}), db)
-	if err != nil {
-		return nil, "", err
+	// prepare snaps
+	snapconfig := snapshot.Config{
+		CacheSize:  256,
+		Recovery:   false,
+		NoBuild:    false,
+		AsyncBuild: false,
 	}
 
-	return stateDB, datadir, nil
+	snaps, _ := snapshot.New(snapconfig, chainDb, trieDb, common.HexToHash("hellomynameisghc")) // TODO I'm not sure about this code
+
+	stateDB, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(chainDb, trieDb), snaps)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return stateDB, trieDb, nil
+}
+
+func prepareFiles(ctx *cli.Context) (files []string) {
+	if ctx.IsSet(zipDirFlag.Name) {
+		zipDir := ctx.String(zipDirFlag.Name)
+		for _, fileName := range zips {
+			files = append(files, filepath.Join(zipDir, fileName+"_BlockTransaction.zip"))
+		}
+	} else {
+		// read transactions from zip files
+		files = ctx.Args().Slice()
+	}
+	return
 }
 
 func executeTxFromZipCmd(ctx *cli.Context) error {
-	// read transactions from zip files
-	files := ctx.Args().Slice()
+	stateDB, trieDb, err := prepareDatabase()
 
-	stateDB, datadir, err := prepareDatabase()
-
-	err = processTxFromZip(func(ind int, strings []string) error {
-		return executeTx(stateDB, ind, strings)
-	}, files...)
-
-	// measure storage cost
+	err = processTxFromZip(func(height int) error {
+		return finishBlock(stateDB, trieDb, height)
+	}, func(tx txFromZip) error {
+		return executeTx(stateDB, trieDb, tx)
+	}, prepareFiles(ctx)...)
 	if err != nil {
 		return err
 	}
-	fmt.Println(datadir)
-	storageCost, _ := exec.Command("du", "-sh", datadir).Output()
-	fmt.Println(string(storageCost))
 
-	if ctx.Bool("clean") {
+	if ctx.IsSet(cleanFlag.Name) {
 		err = os.RemoveAll(datadir)
 		if err != nil {
 			return err

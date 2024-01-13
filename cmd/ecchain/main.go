@@ -26,7 +26,10 @@ func init() {
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	app.Flags = flags.Merge()
+	app.Flags = []cli.Flag{
+		zipDirFlag,
+		cleanFlag,
+	}
 
 	app.Before = func(ctx *cli.Context) error {
 		flags.MigrateGlobalFlags(ctx)
@@ -46,16 +49,10 @@ func main() {
 	}
 }
 
-func prepare(ctx *cli.Context) {
-
-}
-
 func ecchain(ctx *cli.Context) error {
 	if args := ctx.Args().Slice(); len(args) > 0 {
 		return fmt.Errorf("invalid command: %q", args[0])
 	}
-
-	prepare(ctx)
 
 	fmt.Println("Hi, my name is EC-Chain.")
 
