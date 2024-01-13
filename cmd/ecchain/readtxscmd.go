@@ -190,7 +190,9 @@ func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) err
 
 func readTxFromZipCmd(ctx *cli.Context) error {
 	files := ctx.Args().Slice()
-	return processTxFromZip(nil, func(tx txFromZip) error {
+	return processTxFromZip(func(i int) error {
+		return nil
+	}, func(tx txFromZip) error {
 		fmt.Println(tx)
 		return nil
 	}, files...)
