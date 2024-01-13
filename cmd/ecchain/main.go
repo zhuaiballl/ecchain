@@ -29,6 +29,7 @@ func init() {
 	app.Flags = []cli.Flag{
 		zipDirFlag,
 		cleanFlag,
+		EcKFlag,
 	}
 
 	app.Before = func(ctx *cli.Context) error {
@@ -47,14 +48,4 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func ecchain(ctx *cli.Context) error {
-	if args := ctx.Args().Slice(); len(args) > 0 {
-		return fmt.Errorf("invalid command: %q", args[0])
-	}
-
-	fmt.Println("Hi, my name is EC-Chain.")
-
-	return nil
 }

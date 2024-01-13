@@ -5,12 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/state/snapshot"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/urfave/cli/v2"
 	"io"
 	"math/big"
@@ -57,8 +51,6 @@ var zips []string = []string{
 	"18000000to18249999",
 	"18250000to18499999",
 }
-
-var datadir string
 
 var (
 	cleanFlag *cli.BoolFlag = &cli.BoolFlag{
@@ -204,18 +196,18 @@ func readTxFromZipCmd(ctx *cli.Context) error {
 	}, files...)
 }
 
-func executeTx(s *state.StateDB, t *trie.Database, tx txFromZip) error {
-	s.AddBalance(common.HexToAddress(tx.sender), big.NewInt(1))
-	s.AddBalance(common.HexToAddress(tx.to), tx.value)
+func executeTx(dbNode *DbNode, tx txFromZip) error {
+	dbNode.stateDb.AddBalance(common.HexToAddress(tx.sender), big.NewInt(1))
+	dbNode.stateDb.AddBalance(common.HexToAddress(tx.to), tx.value)
 	return nil
 }
 
-func finishBlock(s *state.StateDB, t *trie.Database, height int) error {
-	root, err := s.Commit(true)
+func finishBlock(dbNode *DbNode, height int) error {
+	root, err := dbNode.stateDb.Commit(true)
 	if err != nil {
 		return err
 	}
-	err = t.Commit(root, false)
+	err = dbNode.trieDb.Commit(root, false)
 	if err != nil {
 		return err
 	}
@@ -224,54 +216,12 @@ func finishBlock(s *state.StateDB, t *trie.Database, height int) error {
 
 	// measure storage cost of the database
 	//fmt.Println("datadir", datadir, "datadir")
-	cmdOutput, _ := exec.Command("du", "-s", datadir).Output()
+	cmdOutput, _ := exec.Command("du", "-s", dbNode.datadir).Output()
 	storageCost := string(cmdOutput)
 	storageCost = strings.Fields(storageCost)[0]
 	fmt.Println(height, storageCost)
 
 	return nil
-}
-
-func prepareDatabase() (*state.StateDB, *trie.Database, error) {
-	var err error
-	datadir, err = os.MkdirTemp("", "ecchain")
-	if err != nil {
-		return nil, nil, err
-	}
-	//fmt.Println(datadir)
-	nodeConfig := &node.Config{
-		Name:    "geth-ec",
-		Version: params.Version,
-		DataDir: datadir,
-		P2P: p2p.Config{
-			ListenAddr:  "0.0.0.0:0",
-			NoDiscovery: true,
-			MaxPeers:    25,
-		},
-		UseLightweightKDF: true,
-	}
-	tempNode, err := node.New(nodeConfig)
-
-	chainDb, err := tempNode.OpenDatabaseWithFreezer("babadata", 256, 256, "", "eth/db/chaindata/", false)
-	trieDb := trie.NewDatabase(chainDb)
-
-	// prepare snaps
-	snapconfig := snapshot.Config{
-		CacheSize:  256,
-		Recovery:   false,
-		NoBuild:    false,
-		AsyncBuild: false,
-	}
-
-	snaps, _ := snapshot.New(snapconfig, chainDb, trieDb, common.HexToHash("hellomynameisghc")) // TODO I'm not sure about this code
-
-	stateDB, err := state.New(common.Hash{}, state.NewDatabaseWithNodeDB(chainDb, trieDb), snaps)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return stateDB, trieDb, nil
 }
 
 func prepareFiles(ctx *cli.Context) (files []string) {
@@ -288,19 +238,19 @@ func prepareFiles(ctx *cli.Context) (files []string) {
 }
 
 func executeTxFromZipCmd(ctx *cli.Context) error {
-	stateDB, trieDb, err := prepareDatabase()
+	dbNode, err := NewDbNode(0)
 
 	err = processTxFromZip(func(height int) error {
-		return finishBlock(stateDB, trieDb, height)
+		return finishBlock(dbNode, height)
 	}, func(tx txFromZip) error {
-		return executeTx(stateDB, trieDb, tx)
+		return executeTx(dbNode, tx)
 	}, prepareFiles(ctx)...)
 	if err != nil {
 		return err
 	}
 
 	if ctx.IsSet(cleanFlag.Name) {
-		err = os.RemoveAll(datadir)
+		err = os.RemoveAll(dbNode.datadir)
 		if err != nil {
 			return err
 		}

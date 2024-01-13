@@ -1,26 +1,34 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/urfave/cli/v2"
 	"math/big"
+	"os/exec"
+	"strings"
 )
 
-type ecNode struct {
-	addr common.Address
-	db   *state.StateDB
+type EcGroup struct {
+	k     int // size = 2^k
+	size  int
+	nodes []*DbNode
 }
 
-type ecGroup struct {
-	n      int
-	dbList []*state.StateDB
-}
-
-func NewEcGroup(n int) ecGroup {
-	return ecGroup{
-		n:      0,
-		dbList: nil,
+func NewEcGroup(k int) (*EcGroup, error) {
+	g := &EcGroup{
+		k:    k,
+		size: 1 << k,
 	}
+	var err error
+	g.nodes, err = NewDbNodes(g.size)
+	return g, err
+}
+
+func (g *EcGroup) GetNodeForAddress(address common.Address) *DbNode {
+	ind := int(address.Bytes()[0])
+	ind >>= 8 - g.k
+	return g.nodes[ind]
 }
 
 type payload struct {
@@ -28,20 +36,59 @@ type payload struct {
 	value  big.Int
 }
 
-func (g *ecGroup) Size() int {
-	return g.n
+func (g *EcGroup) Size() int {
+	return g.size
 }
 
-func (g *ecGroup) operate(opt string, p payload) {
-	// get the targetDB by the object address
-	obj := p.object
-	ind := int(obj[0])
-	var targetDB *state.StateDB = g.dbList[ind]
+func (g *EcGroup) executeTx(tx txFromZip) {
+	sender := common.HexToAddress(tx.sender)
+	to := common.HexToAddress(tx.to)
+	g.GetNodeForAddress(sender).AddBalance(sender, big.NewInt(1))
+	g.GetNodeForAddress(to).AddBalance(to, tx.value)
+}
 
-	switch opt {
-	case "AddBalance":
-		targetDB.AddBalance(obj, &p.value)
-	case "SubBalance":
-		targetDB.SubBalance(obj, &p.value)
+func (g *EcGroup) Commit(height int) error {
+	fmt.Print(height)
+	for _, n := range g.nodes {
+		root, err := n.stateDb.Commit(true)
+		if err != nil {
+			return err
+		}
+		err = n.trieDb.Commit(root, false)
+		if err != nil {
+			return err
+		}
+
+		// measure storage cost of the node
+		cmdOutput, _ := exec.Command("du", "-s", n.datadir).Output()
+		storageCost := string(cmdOutput)
+		storageCost = strings.Fields(storageCost)[0]
+		fmt.Print(" ", storageCost)
 	}
+	fmt.Println()
+	return nil
+}
+
+var EcKFlag *cli.IntFlag = &cli.IntFlag{
+	Name:  "k",
+	Usage: "EC group size is 2^k",
+	Value: 2,
+}
+
+func ecchain(ctx *cli.Context) error {
+	g, err := NewEcGroup(ctx.Int(EcKFlag.Name))
+	if err != nil {
+		return err
+	}
+	err = processTxFromZip(func(height int) error {
+		return g.Commit(height)
+	}, func(tx txFromZip) error {
+		g.executeTx(tx)
+		return nil
+	}, prepareFiles(ctx)...)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
