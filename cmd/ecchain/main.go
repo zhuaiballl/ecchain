@@ -23,6 +23,7 @@ func init() {
 	app.Commands = []*cli.Command{
 		readtxcmd,
 		executetxcmd,
+		analyzeCmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 

@@ -69,11 +69,18 @@ func (g *EcGroup) Commit(height int) error {
 	return nil
 }
 
-var EcKFlag *cli.IntFlag = &cli.IntFlag{
-	Name:  "k",
-	Usage: "EC group size is 2^k",
-	Value: 2,
-}
+var (
+	EcKFlag *cli.IntFlag = &cli.IntFlag{
+		Name:  "k",
+		Usage: "EC group size is 2^k",
+		Value: 2,
+	}
+	ThresholdFlag *cli.IntFlag = &cli.IntFlag{
+		Name:  "threshold",
+		Usage: "Threshold between cold/hot tries",
+		Value: 10000,
+	}
+)
 
 func ecchain(ctx *cli.Context) error {
 	g, err := NewEcGroup(ctx.Int(EcKFlag.Name))
