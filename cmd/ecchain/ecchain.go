@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 type EcGroup struct {
@@ -40,15 +41,18 @@ func (g *EcGroup) Size() int {
 	return g.size
 }
 
-func (g *EcGroup) executeTx(tx txFromZip) {
-	sender := common.HexToAddress(tx.sender)
-	to := common.HexToAddress(tx.to)
-	g.GetNodeForAddress(sender).AddBalance(sender, big.NewInt(1))
-	g.GetNodeForAddress(to).AddBalance(to, tx.value)
+func (g *EcGroup) executeTx(tx txFromZip) time.Duration {
+	timeBegin := time.Now()
+	for _, addrString := range []string{tx.sender, tx.to} {
+		addr := common.HexToAddress(addrString)
+
+		g.GetNodeForAddress(addr).AddBalance(addr, tx.value)
+	}
+	timeSpent := time.Since(timeBegin)
+	return timeSpent
 }
 
-func (g *EcGroup) Commit(height int) error {
-	fmt.Print(height)
+func (g *EcGroup) Commit(height int, measureStorage, measureTime bool) error {
 	for _, n := range g.nodes {
 		root, err := n.stateDb.Commit(true)
 		if err != nil {
@@ -59,13 +63,14 @@ func (g *EcGroup) Commit(height int) error {
 			return err
 		}
 
-		// measure storage cost of the node
-		cmdOutput, _ := exec.Command("du", "-s", n.datadir).Output()
-		storageCost := string(cmdOutput)
-		storageCost = strings.Fields(storageCost)[0]
-		fmt.Print(" ", storageCost)
+		if measureStorage {
+			// measure storage cost of the node
+			cmdOutput, _ := exec.Command("du", "-s", n.datadir).Output()
+			storageCost := string(cmdOutput)
+			storageCost = strings.Fields(storageCost)[0]
+			fmt.Print(" ", storageCost)
+		}
 	}
-	fmt.Println()
 	return nil
 }
 
@@ -80,17 +85,35 @@ var (
 		Usage: "Threshold between cold/hot tries",
 		Value: 10000,
 	}
+	MeasureTimeFlag *cli.BoolFlag = &cli.BoolFlag{
+		Name:  "time",
+		Usage: "Output time information",
+	}
+	MeasureStorageFlag *cli.BoolFlag = &cli.BoolFlag{
+		Name:  "storage",
+		Usage: "Output storage usage information",
+	}
 )
 
 func ecchain(ctx *cli.Context) error {
+	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
+	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
+
 	g, err := NewEcGroup(ctx.Int(EcKFlag.Name))
 	if err != nil {
 		return err
 	}
+	txCount := 0
+	timeSum := time.Duration(0)
 	err = processTxFromZip(func(height int) error {
-		return g.Commit(height)
+		fmt.Print(height)
+		if measureTime {
+			fmt.Println(" ", float64(timeSum.Nanoseconds())/float64(txCount))
+		}
+		return g.Commit(height, measureStorage, measureTime)
 	}, func(tx txFromZip) error {
-		g.executeTx(tx)
+		timeSum += g.executeTx(tx)
+		txCount++
 		return nil
 	}, prepareFiles(ctx)...)
 	if err != nil {

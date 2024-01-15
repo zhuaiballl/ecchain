@@ -31,6 +31,8 @@ func init() {
 		zipDirFlag,
 		cleanFlag,
 		EcKFlag,
+		MeasureStorageFlag,
+		MeasureTimeFlag,
 	}
 
 	app.Before = func(ctx *cli.Context) error {
