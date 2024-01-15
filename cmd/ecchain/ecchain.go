@@ -74,6 +74,16 @@ func (g *EcGroup) Commit(height int, measureStorage, measureTime bool) error {
 	return nil
 }
 
+func (g *EcGroup) Clean() error {
+	for _, n := range g.nodes {
+		err := n.Clean()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 var (
 	EcKFlag *cli.IntFlag = &cli.IntFlag{
 		Name:  "k",
@@ -106,9 +116,8 @@ func ecchain(ctx *cli.Context) error {
 	txCount := 0
 	timeSum := time.Duration(0)
 	err = processTxFromZip(func(height int) error {
-		fmt.Print(height)
 		if measureTime {
-			fmt.Println(" ", float64(timeSum.Nanoseconds())/float64(txCount))
+			fmt.Print(" ", float64(timeSum.Nanoseconds())/float64(txCount))
 		}
 		return g.Commit(height, measureStorage, measureTime)
 	}, func(tx txFromZip) error {
@@ -119,6 +128,12 @@ func ecchain(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	if ctx.IsSet(cleanFlag.Name) {
+		err = g.Clean()
+		if err != nil {
+			return err
+		}
+	}
 
-	return err
+	return nil
 }

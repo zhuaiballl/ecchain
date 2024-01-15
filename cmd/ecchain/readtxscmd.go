@@ -8,7 +8,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"io"
 	"math/big"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -170,10 +169,12 @@ func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) err
 			// If the previous block ends, run finishBlock
 			if lastBlockNumber != tx.blockNumber {
 				if lastBlockNumber != -1 {
+					fmt.Print(lastBlockNumber, " ")
 					err = finishBlock(lastBlockNumber)
 					if err != nil {
 						return err
 					}
+					fmt.Println("")
 				}
 				lastBlockNumber = tx.blockNumber
 			}
@@ -252,7 +253,7 @@ func executeTxFromZipCmd(ctx *cli.Context) error {
 	}
 
 	if ctx.IsSet(cleanFlag.Name) {
-		err = os.RemoveAll(dbNode.datadir)
+		err = dbNode.Clean()
 		if err != nil {
 			return err
 		}

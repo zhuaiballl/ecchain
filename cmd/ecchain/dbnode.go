@@ -80,3 +80,11 @@ func NewDbNodes(n int) (nodes []*DbNode, err error) {
 func (n *DbNode) AddBalance(address common.Address, value *big.Int) {
 	n.stateDb.AddBalance(address, value)
 }
+
+func (n *DbNode) Clean() error {
+	err := os.RemoveAll(n.datadir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
