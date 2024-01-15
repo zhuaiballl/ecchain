@@ -5,8 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli/v2"
 	"math/big"
-	"os/exec"
-	"strings"
 	"time"
 )
 
@@ -64,11 +62,7 @@ func (g *EcGroup) Commit(height int, measureStorage, measureTime bool) error {
 		}
 
 		if measureStorage {
-			// measure storage cost of the node
-			cmdOutput, _ := exec.Command("du", "-s", n.datadir).Output()
-			storageCost := string(cmdOutput)
-			storageCost = strings.Fields(storageCost)[0]
-			fmt.Print(" ", storageCost)
+			n.measureStorage()
 		}
 	}
 	return nil
@@ -105,7 +99,7 @@ var (
 	}
 )
 
-func ecchain(ctx *cli.Context) error {
+func ecChainCmd(ctx *cli.Context) error {
 	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
 	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
 
@@ -117,8 +111,15 @@ func ecchain(ctx *cli.Context) error {
 	timeSum := time.Duration(0)
 	err = processTxFromZip(func(height int) error {
 		if measureTime {
-			fmt.Print(" ", float64(timeSum.Nanoseconds())/float64(txCount))
+			fmt.Print(" ")
+			if txCount != 0 {
+				fmt.Print(float64(timeSum.Nanoseconds()) / float64(txCount))
+			} else {
+				fmt.Print("-1")
+			}
 		}
+		timeSum = 0
+		txCount = 0
 		return g.Commit(height, measureStorage, measureTime)
 	}, func(tx txFromZip) error {
 		timeSum += g.executeTx(tx)

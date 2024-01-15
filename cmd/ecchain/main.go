@@ -18,11 +18,11 @@ var app = flags.NewApp("the ec-chain command line interface")
 
 func init() {
 	// Initialize the CLI app and start Geth
-	app.Action = ecchain
+	app.Action = ecChainCmd
 	app.Copyright = "Copyright 2013-2023 The go-ethereum Authors"
 	app.Commands = []*cli.Command{
 		readtxcmd,
-		executetxcmd,
+		gethCmd,
 		analyzeCmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))

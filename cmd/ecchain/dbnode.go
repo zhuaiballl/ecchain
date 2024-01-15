@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
@@ -10,6 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"math/big"
 	"os"
+	"os/exec"
+	"strings"
+	"time"
 )
 
 type DbNode struct {
@@ -77,14 +81,46 @@ func NewDbNodes(n int) (nodes []*DbNode, err error) {
 	return
 }
 
-func (n *DbNode) AddBalance(address common.Address, value *big.Int) {
-	n.stateDb.AddBalance(address, value)
+func (dbNode *DbNode) AddBalance(address common.Address, value *big.Int) {
+	dbNode.stateDb.AddBalance(address, value)
 }
 
-func (n *DbNode) Clean() error {
-	err := os.RemoveAll(n.datadir)
+func (dbNode *DbNode) Clean() error {
+	err := os.RemoveAll(dbNode.datadir)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (dbNode *DbNode) executeTx(tx txFromZip) time.Duration {
+	timeBegin := time.Now()
+	for _, addrString := range []string{tx.sender, tx.to} {
+		addr := common.HexToAddress(addrString)
+		dbNode.AddBalance(addr, tx.value)
+	}
+	return time.Since(timeBegin)
+}
+
+func (dbNode *DbNode) measureStorage() {
+	cmdOutput, _ := exec.Command("du", "-s", dbNode.datadir).Output()
+	storageCost := string(cmdOutput)
+	storageCost = strings.Fields(storageCost)[0]
+	fmt.Print(" ", storageCost)
+}
+
+func (dbNode *DbNode) finishBlock(height int, measureStorage, measureTime bool) error {
+	root, err := dbNode.stateDb.Commit(true)
+	if err != nil {
+		return err
+	}
+	err = dbNode.trieDb.Commit(root, false)
+	if err != nil {
+		return err
+	}
+
+	if measureStorage {
+		dbNode.measureStorage()
 	}
 	return nil
 }

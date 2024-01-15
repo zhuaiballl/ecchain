@@ -4,14 +4,11 @@ import (
 	"archive/zip"
 	"encoding/csv"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli/v2"
 	"io"
 	"math/big"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 var zips []string = []string{
@@ -71,16 +68,18 @@ var (
 		Description: `
     ecchain readtx /path/to/my.zip`,
 	}
-	executetxcmd = &cli.Command{
-		Name:   "executetx",
+	gethCmd = &cli.Command{
+		Name:   "geth",
 		Usage:  "Execute transactions from zip",
-		Action: executeTxFromZipCmd,
+		Action: geth,
 		Flags: []cli.Flag{
 			cleanFlag,
 			zipDirFlag,
+			MeasureTimeFlag,
+			MeasureStorageFlag,
 		},
 		ArgsUsage:   "",
-		Description: "ecchain execute /path/to/my.zip",
+		Description: "ecchain geth /path/to/my.zip",
 	}
 )
 
@@ -199,34 +198,6 @@ func readTxFromZipCmd(ctx *cli.Context) error {
 	}, files...)
 }
 
-func executeTx(dbNode *DbNode, tx txFromZip) error {
-	dbNode.stateDb.AddBalance(common.HexToAddress(tx.sender), big.NewInt(1))
-	dbNode.stateDb.AddBalance(common.HexToAddress(tx.to), tx.value)
-	return nil
-}
-
-func finishBlock(dbNode *DbNode, height int) error {
-	root, err := dbNode.stateDb.Commit(true)
-	if err != nil {
-		return err
-	}
-	err = dbNode.trieDb.Commit(root, false)
-	if err != nil {
-		return err
-	}
-
-	//fmt.Println("Block", height)
-
-	// measure storage cost of the database
-	//fmt.Println("datadir", datadir, "datadir")
-	cmdOutput, _ := exec.Command("du", "-s", dbNode.datadir).Output()
-	storageCost := string(cmdOutput)
-	storageCost = strings.Fields(storageCost)[0]
-	fmt.Println(height, storageCost)
-
-	return nil
-}
-
 func prepareFiles(ctx *cli.Context) (files []string) {
 	if ctx.IsSet(zipDirFlag.Name) {
 		zipDir := ctx.String(zipDirFlag.Name)
@@ -238,27 +209,6 @@ func prepareFiles(ctx *cli.Context) (files []string) {
 		files = ctx.Args().Slice()
 	}
 	return
-}
-
-func executeTxFromZipCmd(ctx *cli.Context) error {
-	dbNode, err := NewDbNode(0)
-
-	err = processTxFromZip(func(height int) error {
-		return finishBlock(dbNode, height)
-	}, func(tx txFromZip) error {
-		return executeTx(dbNode, tx)
-	}, prepareFiles(ctx)...)
-	if err != nil {
-		return err
-	}
-
-	if ctx.IsSet(cleanFlag.Name) {
-		err = dbNode.Clean()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func ToInt(str string) int {
