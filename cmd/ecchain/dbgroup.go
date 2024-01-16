@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli/v2"
-	"math/big"
 	"time"
 )
 
@@ -14,7 +13,7 @@ type DbGroup struct {
 	nodes []*DbNode
 }
 
-func NewEcGroup(k int) (*DbGroup, error) {
+func NewDbGroup(k int) (*DbGroup, error) {
 	g := &DbGroup{
 		k:    k,
 		size: 1 << k,
@@ -30,20 +29,10 @@ func (g *DbGroup) GetNodeForAddress(address common.Address) *DbNode {
 	return g.nodes[ind]
 }
 
-type payload struct {
-	object common.Address
-	value  big.Int
-}
-
-func (g *DbGroup) Size() int {
-	return g.size
-}
-
 func (g *DbGroup) executeTx(tx txFromZip) time.Duration {
 	timeBegin := time.Now()
 	for _, addrString := range []string{tx.sender, tx.to} {
 		addr := common.HexToAddress(addrString)
-
 		g.GetNodeForAddress(addr).AddBalance(addr, tx.value)
 	}
 	timeSpent := time.Since(timeBegin)
@@ -62,7 +51,7 @@ func (g *DbGroup) Commit(height int, measureStorage, measureTime bool) error {
 		}
 
 		if measureStorage {
-			n.measureStorage()
+			fmt.Print(" ", n.StorageCost())
 		}
 	}
 	return nil
@@ -87,7 +76,7 @@ var (
 	ThresholdFlag *cli.IntFlag = &cli.IntFlag{
 		Name:  "threshold",
 		Usage: "Threshold between cold/hot tries",
-		Value: 10000,
+		Value: 100,
 	}
 	MeasureTimeFlag *cli.BoolFlag = &cli.BoolFlag{
 		Name:  "time",
@@ -99,11 +88,11 @@ var (
 	}
 )
 
-func ecChainCmd(ctx *cli.Context) error {
+func dbGroup(ctx *cli.Context) error {
 	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
 	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
 
-	g, err := NewEcGroup(ctx.Int(EcKFlag.Name))
+	g, err := NewDbGroup(ctx.Int(EcKFlag.Name))
 	if err != nil {
 		return err
 	}

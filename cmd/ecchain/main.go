@@ -18,7 +18,7 @@ var app = flags.NewApp("the ec-chain command line interface")
 
 func init() {
 	// Initialize the CLI app and start Geth
-	app.Action = ecChainCmd
+	app.Action = ecchain
 	app.Copyright = "Copyright 2013-2023 The go-ethereum Authors"
 	app.Commands = []*cli.Command{
 		readtxcmd,
@@ -33,6 +33,7 @@ func init() {
 		EcKFlag,
 		MeasureStorageFlag,
 		MeasureTimeFlag,
+		ThresholdFlag,
 	}
 
 	app.Before = func(ctx *cli.Context) error {

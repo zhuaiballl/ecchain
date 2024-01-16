@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -81,12 +82,41 @@ func NewDbNodes(n int) (nodes []*DbNode, err error) {
 	return
 }
 
+func (dbNode *DbNode) Exist(address common.Address) bool {
+	return dbNode.stateDb.Exist(address)
+}
+
+func (dbNode *DbNode) Delete(address common.Address) {
+	obj := dbNode.stateDb.GetOrNewStateObject(address)
+	dbNode.stateDb.DeleteStateObject(obj)
+}
+
 func (dbNode *DbNode) AddBalance(address common.Address, value *big.Int) {
 	dbNode.stateDb.AddBalance(address, value)
 }
 
+func (dbNode *DbNode) SetNonce(address common.Address, nonce uint64) {
+	dbNode.stateDb.SetNonce(address, nonce)
+}
+
+func (dbNode *DbNode) GetNonce(address common.Address) uint64 {
+	return dbNode.stateDb.GetNonce(address)
+}
+
 func (dbNode *DbNode) Clean() error {
 	err := os.RemoveAll(dbNode.datadir)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (dbNode *DbNode) Commit() error {
+	root, err := dbNode.stateDb.Commit(true)
+	if err != nil {
+		return err
+	}
+	err = dbNode.trieDb.Commit(root, false)
 	if err != nil {
 		return err
 	}
@@ -102,11 +132,12 @@ func (dbNode *DbNode) executeTx(tx txFromZip) time.Duration {
 	return time.Since(timeBegin)
 }
 
-func (dbNode *DbNode) measureStorage() {
+func (dbNode *DbNode) StorageCost() int {
 	cmdOutput, _ := exec.Command("du", "-s", dbNode.datadir).Output()
 	storageCost := string(cmdOutput)
 	storageCost = strings.Fields(storageCost)[0]
-	fmt.Print(" ", storageCost)
+	costInt, _ := strconv.Atoi(storageCost)
+	return costInt
 }
 
 func (dbNode *DbNode) finishBlock(height int, measureStorage, measureTime bool) error {
@@ -120,7 +151,7 @@ func (dbNode *DbNode) finishBlock(height int, measureStorage, measureTime bool) 
 	}
 
 	if measureStorage {
-		dbNode.measureStorage()
+		fmt.Print(" ", dbNode.StorageCost())
 	}
 	return nil
 }

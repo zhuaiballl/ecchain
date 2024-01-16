@@ -538,6 +538,19 @@ func (s *StateDB) deleteStateObject(obj *stateObject) {
 	}
 }
 
+// DeleteStateObject removes the given object from the state trie.
+func (s *StateDB) DeleteStateObject(obj *stateObject) {
+	// Track the amount of time wasted on deleting the account from the trie
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { s.AccountUpdates += time.Since(start) }(time.Now())
+	}
+	// Delete the account from the trie
+	addr := obj.Address()
+	if err := s.trie.DeleteAccount(addr); err != nil {
+		s.setError(fmt.Errorf("deleteStateObject (%x) error: %v", addr[:], err))
+	}
+}
+
 // getStateObject retrieves a state object given by the address, returning nil if
 // the object is not found or was deleted in this execution context. If you need
 // to differentiate between non-existent/just-deleted, use getDeletedStateObject.
