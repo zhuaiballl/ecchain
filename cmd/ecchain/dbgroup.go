@@ -88,6 +88,20 @@ var (
 	}
 )
 
+var dbGroupCmd = &cli.Command{
+	Name:   "dbgroup",
+	Usage:  "Execute transactions with dbgroup",
+	Action: dbGroup,
+	Flags: []cli.Flag{
+		cleanFlag,
+		zipDirFlag,
+		EcKFlag,
+		MeasureTimeFlag,
+		MeasureStorageFlag,
+	},
+	Description: "ecchain dbgroup /path/to/my.zip",
+}
+
 func dbGroup(ctx *cli.Context) error {
 	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
 	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)

@@ -24,6 +24,7 @@ func init() {
 		readtxcmd,
 		gethCmd,
 		analyzeCmd,
+		dbGroupCmd,
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 
