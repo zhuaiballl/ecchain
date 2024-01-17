@@ -166,10 +166,10 @@ func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) err
 			tx.value.SetString(record[8], 10)
 
 			// If the previous block ends, run finishBlock
-			if lastBlockNumber != tx.blockNumber {
+			if lastBlockNumber/10000 != tx.blockNumber/10000 {
 				if lastBlockNumber != -1 {
 					fmt.Print(lastBlockNumber, " ")
-					err = finishBlock(lastBlockNumber)
+					err = finishBlock((lastBlockNumber + 9999) / 10000 * 10000)
 					if err != nil {
 						return err
 					}
