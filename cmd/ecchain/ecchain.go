@@ -27,7 +27,7 @@ func NewEcGroup(k, threshold int) (*EcGroup, error) {
 }
 
 func (g *EcGroup) IsHot(address common.Address) bool {
-	return g.nodes[0].hot.Exist(address)
+	return g.nodes[1].hot.Exist(address)
 }
 
 func (g *EcGroup) GetNodeForAddress(address common.Address) *EcNode {
@@ -88,11 +88,14 @@ func (g *EcGroup) executeTx(tx txFromZip) time.Duration {
 }
 
 func (g *EcGroup) Commit(height int, measureStorage, measureTime bool) error {
-	for _, n := range g.nodes {
+	for i, n := range g.nodes {
 		if err := n.Commit(); err != nil {
 			return err
 		}
 
+		if i == 0 {
+			continue
+		}
 		if measureStorage {
 			fmt.Print(" ", n.StorageCost())
 		}
