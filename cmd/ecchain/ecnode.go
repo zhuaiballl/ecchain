@@ -40,12 +40,12 @@ func (ecNode *EcNode) AddBalanceHot(address common.Address, value *big.Int) {
 	ecNode.hot.AddBalance(address, value)
 }
 
-func (ecNode *EcNode) AddBalanceCold(address common.Address, value *big.Int) {
-	ecNode.cold.AddBalance(address, value)
+func (ecNode *EcNode) SetBalanceCold(address common.Address, value *big.Int) {
+	ecNode.cold.SetBalance(address, value)
 }
 
-func (ecNode *EcNode) SetNonce(address common.Address, nonce uint64) {
-	ecNode.hot.SetNonce(address, nonce)
+func (ecNode *EcNode) SetBalance(address common.Address, amount *big.Int) {
+	ecNode.hot.SetBalance(address, amount)
 }
 
 func (ecNode *EcNode) GetNonce(address common.Address) uint64 {
@@ -77,5 +77,5 @@ func (ecNode *EcNode) Clean() error {
 }
 
 func (ecNode *EcNode) StorageCost() int {
-	return ecNode.hot.StorageCost() + ecNode.cold.StorageCost()
+	return ecNode.hot.StorageCost() // + ecNode.cold.StorageCost()
 }
