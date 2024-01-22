@@ -31,10 +31,11 @@ func init() {
 	app.Flags = []cli.Flag{
 		zipDirFlag,
 		cleanFlag,
-		EcKFlag,
-		MeasureStorageFlag,
-		MeasureTimeFlag,
-		ThresholdFlag,
+		ecKFlag,
+		measureStorageFlag,
+		measureTimeFlag,
+		thresholdFlag,
+		debugFlag,
 	}
 
 	app.Before = func(ctx *cli.Context) error {

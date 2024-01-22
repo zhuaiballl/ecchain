@@ -10,7 +10,7 @@ var analyzeCmd = &cli.Command{
 	Action: analyze,
 	Flags: []cli.Flag{
 		zipDirFlag,
-		ThresholdFlag,
+		thresholdFlag,
 	},
 	Description: `
     ecchain analyze /path/to/my.zip`,
@@ -86,7 +86,7 @@ func analyze(ctx *cli.Context) error {
 	hotTrieSize = 0
 	coldTrieSize = 0
 
-	threshold := ctx.Int(ThresholdFlag.Name)
+	threshold := ctx.Int(thresholdFlag.Name)
 	err := processTxFromZip(func(height int) error {
 		return encoldAccounts(height, threshold, hot, cold)
 	}, func(tx txFromZip) error {

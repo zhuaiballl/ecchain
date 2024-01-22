@@ -67,27 +67,6 @@ func (g *DbGroup) Clean() error {
 	return nil
 }
 
-var (
-	EcKFlag *cli.IntFlag = &cli.IntFlag{
-		Name:  "k",
-		Usage: "EC group size is 2^k",
-		Value: 2,
-	}
-	ThresholdFlag *cli.IntFlag = &cli.IntFlag{
-		Name:  "threshold",
-		Usage: "Threshold between cold/hot tries",
-		Value: 100,
-	}
-	MeasureTimeFlag *cli.BoolFlag = &cli.BoolFlag{
-		Name:  "time",
-		Usage: "Output time information",
-	}
-	MeasureStorageFlag *cli.BoolFlag = &cli.BoolFlag{
-		Name:  "storage",
-		Usage: "Output storage usage information",
-	}
-)
-
 var dbGroupCmd = &cli.Command{
 	Name:   "dbgroup",
 	Usage:  "Execute transactions with dbgroup",
@@ -95,18 +74,18 @@ var dbGroupCmd = &cli.Command{
 	Flags: []cli.Flag{
 		cleanFlag,
 		zipDirFlag,
-		EcKFlag,
-		MeasureTimeFlag,
-		MeasureStorageFlag,
+		ecKFlag,
+		measureTimeFlag,
+		measureStorageFlag,
 	},
 	Description: "ecchain dbgroup /path/to/my.zip",
 }
 
 func dbGroup(ctx *cli.Context) error {
-	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
-	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
+	measureTime := ctx.IsSet(measureTimeFlag.Name)
+	measureStorage := ctx.IsSet(measureStorageFlag.Name)
 
-	g, err := NewDbGroup(ctx.Int(EcKFlag.Name))
+	g, err := NewDbGroup(ctx.Int(ecKFlag.Name))
 	if err != nil {
 		return err
 	}

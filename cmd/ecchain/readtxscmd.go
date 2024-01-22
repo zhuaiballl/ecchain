@@ -49,17 +49,6 @@ var zips []string = []string{
 }
 
 var (
-	cleanFlag *cli.BoolFlag = &cli.BoolFlag{
-		Name:  "clean",
-		Usage: "Remove the temp folder after run",
-	}
-	zipDirFlag *cli.StringFlag = &cli.StringFlag{
-		Name:  "zipdir",
-		Usage: "Directory of zip files",
-	}
-)
-
-var (
 	readtxcmd = &cli.Command{
 		Name:      "readtx",
 		Usage:     "Read transactions from zip",
@@ -75,8 +64,9 @@ var (
 		Flags: []cli.Flag{
 			cleanFlag,
 			zipDirFlag,
-			MeasureTimeFlag,
-			MeasureStorageFlag,
+			measureTimeFlag,
+			measureStorageFlag,
+			debugFlag,
 		},
 		ArgsUsage:   "",
 		Description: "ecchain geth /path/to/my.zip",
