@@ -38,7 +38,7 @@ func geth(ctx *cli.Context) error {
 		if err := dbNode.Commit(); err != nil {
 			return err
 		}
-		if measureStorage && (debugging || height != lstBlock) {
+		if measureStorage && (debugging || height/10000 != lstBlock/10000) {
 			fmt.Print(" ", dbNode.StorageCost())
 		}
 		lstBlock = height
