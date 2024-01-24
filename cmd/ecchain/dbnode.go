@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
@@ -95,8 +94,12 @@ func (dbNode *DbNode) AddBalance(address common.Address, value *big.Int) {
 	dbNode.stateDb.AddBalance(address, value)
 }
 
-func (dbNode *DbNode) SetNonce(address common.Address, nonce uint64) {
-	dbNode.stateDb.SetNonce(address, nonce)
+func (dbNode *DbNode) SetBalance(address common.Address, amount *big.Int) {
+	dbNode.stateDb.SetBalance(address, amount)
+}
+
+func (dbNode *DbNode) GetBalance(address common.Address) *big.Int {
+	return dbNode.stateDb.GetBalance(address)
 }
 
 func (dbNode *DbNode) GetNonce(address common.Address) uint64 {
@@ -138,20 +141,4 @@ func (dbNode *DbNode) StorageCost() int {
 	storageCost = strings.Fields(storageCost)[0]
 	costInt, _ := strconv.Atoi(storageCost)
 	return costInt
-}
-
-func (dbNode *DbNode) finishBlock(height int, measureStorage, measureTime bool) error {
-	root, err := dbNode.stateDb.Commit(true)
-	if err != nil {
-		return err
-	}
-	err = dbNode.trieDb.Commit(root, false)
-	if err != nil {
-		return err
-	}
-
-	if measureStorage {
-		fmt.Print(" ", dbNode.StorageCost())
-	}
-	return nil
 }

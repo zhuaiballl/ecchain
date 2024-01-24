@@ -49,17 +49,6 @@ var zips []string = []string{
 }
 
 var (
-	cleanFlag *cli.BoolFlag = &cli.BoolFlag{
-		Name:  "clean",
-		Usage: "Remove the temp folder after run",
-	}
-	zipDirFlag *cli.StringFlag = &cli.StringFlag{
-		Name:  "zipdir",
-		Usage: "Directory of zip files",
-	}
-)
-
-var (
 	readtxcmd = &cli.Command{
 		Name:      "readtx",
 		Usage:     "Read transactions from zip",
@@ -75,8 +64,9 @@ var (
 		Flags: []cli.Flag{
 			cleanFlag,
 			zipDirFlag,
-			MeasureTimeFlag,
-			MeasureStorageFlag,
+			measureTimeFlag,
+			measureStorageFlag,
+			debugFlag,
 		},
 		ArgsUsage:   "",
 		Description: "ecchain geth /path/to/my.zip",
@@ -168,12 +158,10 @@ func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) err
 			// If the previous block ends, run finishBlock
 			if lastBlockNumber != tx.blockNumber {
 				if lastBlockNumber != -1 {
-					fmt.Print(lastBlockNumber, " ")
 					err = finishBlock(lastBlockNumber)
 					if err != nil {
 						return err
 					}
-					fmt.Println("")
 				}
 				lastBlockNumber = tx.blockNumber
 			}

@@ -101,9 +101,9 @@ var dbGroupCmd = &cli.Command{
 	Flags: []cli.Flag{
 		cleanFlag,
 		zipDirFlag,
-		EcKFlag,
-		MeasureTimeFlag,
-		MeasureStorageFlag,
+		ecKFlag,
+		measureTimeFlag,
+		measureStorageFlag,
 		IndFlag,
 	},
 	Description: "ecchain dbgroup /path/to/my.zip",
@@ -114,10 +114,10 @@ func dbGroup(ctx *cli.Context) error {
 		return oneNodeFromDBGroup(ctx)
 	}
 
-	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
-	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
+	measureTime := ctx.IsSet(measureTimeFlag.Name)
+	measureStorage := ctx.IsSet(measureStorageFlag.Name)
 
-	g, err := NewDbGroup(ctx.Int(EcKFlag.Name))
+	g, err := NewDbGroup(ctx.Int(ecKFlag.Name))
 	if err != nil {
 		return err
 	}
