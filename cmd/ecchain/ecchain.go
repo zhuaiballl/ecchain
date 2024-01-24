@@ -28,7 +28,7 @@ func NewEcGroup(k, threshold int) (*EcGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-	g.metaNode, err = NewEcNode()
+	g.metaNode, err = NewEcNode(k, threshold, g.size)
 	if err != nil {
 		return nil, err
 	}
