@@ -22,7 +22,7 @@ func NewEcGroup(k, threshold int) (*EcGroup, error) {
 		threshold: threshold,
 	}
 	var err error
-	g.nodes, err = NewEcNodes(g.size)
+	g.nodes, err = NewEcNodes(k, threshold)
 	return g, err
 }
 
@@ -30,10 +30,14 @@ func (g *EcGroup) IsHot(address common.Address) bool {
 	return g.nodes[0].hot.Exist(address)
 }
 
-func (g *EcGroup) GetNodeForAddress(address common.Address) *EcNode {
+func GetIndForAddress(k int, address common.Address) int {
 	ind := int(address.Bytes()[0])
-	ind >>= 8 - g.k
-	return g.nodes[ind]
+	ind >>= 8 - k
+	return ind
+}
+
+func (g *EcGroup) GetNodeForAddress(address common.Address) *EcNode {
+	return g.nodes[GetIndForAddress(g.k, address)]
 }
 
 var txCounts [][2]int

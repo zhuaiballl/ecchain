@@ -6,11 +6,14 @@ import (
 )
 
 type EcNode struct {
-	hot  *DbNode
-	cold *DbNode
+	k         int
+	threshold int
+	ind       int
+	hot       *DbNode
+	cold      *DbNode
 }
 
-func NewEcNode() (*EcNode, error) {
+func NewEcNode(k, threshold, ind int) (*EcNode, error) {
 	hot, err := NewDbNode(1)
 	if err != nil {
 		return nil, err
@@ -20,13 +23,15 @@ func NewEcNode() (*EcNode, error) {
 		return nil, err
 	}
 	return &EcNode{
+		k, threshold, ind,
 		hot, cold,
 	}, nil
 }
 
-func NewEcNodes(size int) (nodes []*EcNode, err error) {
+func NewEcNodes(k, threshold int) (nodes []*EcNode, err error) {
+	size := 1 << k
 	for i := 0; i < size; i++ {
-		newNode, nerr := NewEcNode()
+		newNode, nerr := NewEcNode(k, threshold, i)
 		if nerr != nil {
 			err = nerr
 			return
