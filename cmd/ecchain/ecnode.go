@@ -77,5 +77,5 @@ func (ecNode *EcNode) Clean() error {
 }
 
 func (ecNode *EcNode) StorageCost() int {
-	return ecNode.hot.StorageCost() // + ecNode.cold.StorageCost()
+	return ecNode.hot.StorageCost() + ecNode.cold.StorageCost()
 }
