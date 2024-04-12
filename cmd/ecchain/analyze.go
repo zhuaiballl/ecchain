@@ -85,16 +85,30 @@ func analyze(ctx *cli.Context) error {
 	coldReadCount = 0
 	hotTrieSize = 0
 	coldTrieSize = 0
+	lstBlock := -1
 
 	threshold := ctx.Int(thresholdFlag.Name)
+	gasSum := 0
+	txCount := 0
 	err := processTxFromZip(func(height int) error {
-		return encoldAccounts(height, threshold, hot, cold)
+		if err := encoldAccounts(height, threshold, hot, cold); err != nil {
+			return err
+		}
+
+		if height/10000 != lstBlock/10000 {
+			println(height, coldReadCount, txCount)
+		}
+		lstBlock = height
+		coldReadCount = 0
+		txCount = 0
+		return nil
 	}, func(tx txFromZip) error {
+		gasSum += tx.gasUsed
+		txCount++
 		return updateWithTx(tx, hot, cold)
 	}, prepareFiles(ctx)...)
 	if err != nil {
 		return err
 	}
-	println(threshold, coldReadCount, coldTrieSize, hotTrieSize)
 	return nil
 }
