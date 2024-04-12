@@ -18,7 +18,7 @@ while [[ "$i" -le "$END" ]]
 do
 	echo -n "($i/$END)"
 	mkdir -p ./gethaccounts/nodes/"$i"
-	./bin/geth-timing --experiment.output=./output/deleteme.txt --datadir ./gethaccounts/nodes/"$i" --password ./password/password.txt account new > /dev/null 2>&1
+	./bin/geth --experiment.output=./output/deleteme.txt --datadir ./gethaccounts/nodes/"$i" --password ./password/password.txt account new > /dev/null 2>&1
 	printf '\r'
 	((i = i + 1))
 done
