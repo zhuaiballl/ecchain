@@ -12,7 +12,7 @@ Compile and put the executables in the bin folder as follows.
 
 ```
 # Put the executables as follows:
-# cp [geth]./bin/geth-timing
+# cp [geth]./bin/geth
 ```
 
 If for some reasons the x-permission is lost, grant the x-permission on executables.
@@ -35,7 +35,7 @@ echo 1000 | ./make_accounts.sh
 
 ## Step 1.5: [Server side] (if necessary) Edit genesis-template.json
 
-```json
+```
 {
   "config": {
     "chainId": 63898,
