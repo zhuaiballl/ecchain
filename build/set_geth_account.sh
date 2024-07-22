@@ -2,8 +2,8 @@
 set -e
 
 read -p "Which account to be used (0 represents the server)? " carid
-if ! [[ "$carid" == ?(-)+([0-9]) ]] ; then
-	echo "error: Not a number" >&2; exit 1
+if ! [[ "$carid" =~ ^[0-9]+$ ]] ; then
+	echo "error: Not a non-negative number" >&2; exit 1
 fi
 
 account_dir="./gethaccounts/nodes/$carid"

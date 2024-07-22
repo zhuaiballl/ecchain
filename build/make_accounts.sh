@@ -2,8 +2,8 @@
 set -e
 
 read -p "How many node accounts do you want to generate? " count
-if ! [[ "$count" == ?(-)+([0-9]) ]] ; then
-	echo "error: Not a number" >&2; exit 1
+if ! [[ "$count" =~ ^[0-9]+$ ]] ; then
+	echo "error: Not a non-negative number" >&2; exit 1
 fi
 
 rm -rf ./gethaccounts/nodes/* || true
