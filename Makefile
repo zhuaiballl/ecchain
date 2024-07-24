@@ -11,7 +11,7 @@ GORUN = env GO111MODULE=on go run
 ec:
 	$(GORUN) build/ci.go install ./cmd/ecchain
 	@echo "Done building."
-	@echo "Run \"$(GOBIN)/ecchain\" to launch geth."
+	@echo "Run \"$(GOBIN)/ecchain\" to launch EC-Chain."
 
 geth:
 	$(GORUN) build/ci.go install ./cmd/geth
