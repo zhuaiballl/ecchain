@@ -20,10 +20,15 @@ var (
 		Usage: "EC group size is 2^k",
 		Value: 2,
 	}
-	thresholdFlag = &cli.IntFlag{
-		Name:  "threshold",
-		Usage: "Threshold between cold/hot tries",
+	recencyFlag = &cli.IntFlag{
+		Name:  "recency",
+		Usage: "Recency threshold between cold/hot tries",
 		Value: 10000,
+	}
+	frequencyFlag = &cli.Float64Flag{
+		Name:  "frequency",
+		Usage: "Frequency threshold between cold/hot tries",
+		Value: 0.01,
 	}
 	measureTimeFlag = &cli.BoolFlag{
 		Name:  "time",

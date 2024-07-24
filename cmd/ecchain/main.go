@@ -34,7 +34,8 @@ func init() {
 		ecKFlag,
 		measureStorageFlag,
 		measureTimeFlag,
-		thresholdFlag,
+		recencyFlag,
+		frequencyFlag,
 		debugFlag,
 	}
 

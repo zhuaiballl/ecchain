@@ -121,7 +121,7 @@ func (g *EcGroup) Clean() error {
 func ecchain(ctx *cli.Context) error {
 	measureTime := ctx.IsSet(measureTimeFlag.Name)
 	measureStorage := ctx.IsSet(measureStorageFlag.Name)
-	threshold := ctx.Int(thresholdFlag.Name)
+	threshold := ctx.Int(recencyFlag.Name)
 	debugging := ctx.IsSet(debugFlag.Name)
 
 	g, err := NewEcGroup(ctx.Int(ecKFlag.Name), threshold)
