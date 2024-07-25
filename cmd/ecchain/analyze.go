@@ -13,6 +13,7 @@ var analyzeCmd = &cli.Command{
 	Flags: []cli.Flag{
 		zipDirFlag,
 		recencyFlag,
+		frequencyFlag,
 	},
 	Description: `
     ecchain analyze /path/to/my.zip`,
