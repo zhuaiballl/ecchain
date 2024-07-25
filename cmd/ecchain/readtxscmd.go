@@ -50,9 +50,12 @@ var zips []string = []string{
 
 var (
 	readtxcmd = &cli.Command{
-		Name:      "readtx",
-		Usage:     "Read transactions from zip",
-		Action:    readTxFromZipCmd,
+		Name:   "readtx",
+		Usage:  "Read transactions from zip",
+		Action: readTxFromZipCmd,
+		Flags: []cli.Flag{
+			zipDirFlag,
+		},
 		ArgsUsage: "",
 		Description: `
     ecchain readtx /path/to/my.zip`,
@@ -177,13 +180,12 @@ func processTxFromZip(finishBlock func(int) error, processTx func(txFromZip) err
 }
 
 func readTxFromZipCmd(ctx *cli.Context) error {
-	files := ctx.Args().Slice()
 	return processTxFromZip(func(i int) error {
 		return nil
 	}, func(tx txFromZip) error {
 		fmt.Println(tx)
 		return nil
-	}, files...)
+	}, prepareFiles(ctx)...)
 }
 
 func prepareFiles(ctx *cli.Context) (files []string) {
