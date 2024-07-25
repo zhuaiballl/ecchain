@@ -77,11 +77,13 @@ func updateWithTx(tx txFromZip, recency int, frequency float64) error {
 			}
 			return b
 		}(tx.blockNumber+recency, createdHeight[addr]+int(math.Ceil(float64(accessTime[addr])/frequency)))
-		blockToExpire[addr] = newBlockToExpire
-		if _, ok := accountsToExpire[newBlockToExpire]; !ok {
-			accountsToExpire[newBlockToExpire] = make(map[string]bool)
+		if newBlockToExpire < 4000000 {
+			blockToExpire[addr] = newBlockToExpire
+			if _, ok := accountsToExpire[newBlockToExpire]; !ok {
+				accountsToExpire[newBlockToExpire] = make(map[string]bool)
+			}
+			accountsToExpire[newBlockToExpire][addr] = true
 		}
-		accountsToExpire[newBlockToExpire][addr] = true
 	}
 	if len(hotAccounts) > hotTrieSize {
 		hotTrieSize = len(hotAccounts)
