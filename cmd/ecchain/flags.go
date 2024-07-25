@@ -28,7 +28,7 @@ var (
 	frequencyFlag = &cli.Float64Flag{
 		Name:  "frequency",
 		Usage: "Frequency threshold between cold/hot tries",
-		Value: 0.01,
+		Value: 1,
 	}
 	measureTimeFlag = &cli.BoolFlag{
 		Name:  "time",
