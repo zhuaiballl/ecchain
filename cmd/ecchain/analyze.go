@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/urfave/cli/v2"
+	"math"
+	"strconv"
 )
 
 var analyzeCmd = &cli.Command{
@@ -17,10 +19,15 @@ var analyzeCmd = &cli.Command{
 }
 
 var (
-	coldReadCount int
-	hotTrieSize   int
-	coldTrieSize  int
-	blockQueue    []block
+	coldReadCount    int
+	hotTrieSize      int
+	coldTrieSize     int
+	hotAccounts      map[string]bool
+	coldAccounts     map[string]bool
+	blockToExpire    map[string]int
+	createdHeight    map[string]int
+	accessTime       map[string]int
+	accountsToExpire map[int]map[string]bool
 )
 
 type block struct {
@@ -33,79 +40,91 @@ func (b *block) appendAddr(addr ...string) {
 }
 
 // BEGIN cold read vs. threshold
-func encoldAccounts(height, threshold int, hot map[string]int, cold map[string]interface{}) error {
-	if len(blockQueue) == 0 {
-		return nil
+func encoldAccounts(height int) error {
+	for addr := range accountsToExpire[height] {
+		coldAccounts[addr] = true
+		delete(hotAccounts, addr)
 	}
-	if blockQueue[0].height >= height-threshold {
-		return nil
+	delete(accountsToExpire, height)
+	if len(coldAccounts) > coldTrieSize {
+		coldTrieSize = len(coldAccounts)
 	}
-	for _, addr := range blockQueue[0].addresses {
-		if hot[addr] < height-threshold {
-			cold[addr] = 1
-			delete(hot, addr)
-		}
-	}
-	if len(cold) > coldTrieSize {
-		coldTrieSize = len(cold)
-	}
-	blockQueue = blockQueue[1:]
 	return nil
 }
 
-func updateWithTx(tx txFromZip, hot map[string]int, cold map[string]interface{}) error {
+func updateWithTx(tx txFromZip, recency int, frequency float64) error {
 	// update hot and cold tries
 	for _, addr := range []string{tx.sender, tx.to} {
-		if _, ok := hot[addr]; !ok {
+		if _, ok := hotAccounts[addr]; !ok {
 			coldReadCount++
-			if _, okk := cold[addr]; okk {
-				delete(cold, addr)
+			if _, okk := coldAccounts[addr]; okk {
+				delete(coldAccounts, addr)
+			} else {
+				createdHeight[addr] = tx.blockNumber
 			}
 		}
-		hot[addr] = tx.blockNumber
+		hotAccounts[addr] = true
+		if _, ok := accessTime[addr]; !ok {
+			accessTime[addr] = 1
+		} else {
+			accessTime[addr]++
+			delete(accountsToExpire[blockToExpire[addr]], addr)
+		}
+		newBlockToExpire := func(a, b int) int {
+			if a > b {
+				return a
+			}
+			return b
+		}(tx.blockNumber+recency, createdHeight[addr]+int(math.Ceil(float64(accessTime[addr])/frequency)))
+		blockToExpire[addr] = newBlockToExpire
+		if _, ok := accountsToExpire[newBlockToExpire]; !ok {
+			accountsToExpire[newBlockToExpire] = make(map[string]bool)
+		}
+		accountsToExpire[newBlockToExpire][addr] = true
 	}
-	if len(hot) > hotTrieSize {
-		hotTrieSize = len(hot)
+	if len(hotAccounts) > hotTrieSize {
+		hotTrieSize = len(hotAccounts)
 	}
 
-	// update blockQueue
-	if len(blockQueue) > 0 && tx.blockNumber == blockQueue[len(blockQueue)-1].height {
-		blockQueue[len(blockQueue)-1].appendAddr(tx.sender, tx.to)
-	} else {
-		blockQueue = append(blockQueue, block{tx.blockNumber, []string{tx.sender, tx.to}})
-	}
 	return nil
 }
 
 // END cold read vs. threshold
 
 func analyze(ctx *cli.Context) error {
-	hot := make(map[string]int)
-	cold := make(map[string]interface{})
+	hotAccounts = make(map[string]bool)
+	coldAccounts = make(map[string]bool)
+	blockToExpire = make(map[string]int)
+	createdHeight = make(map[string]int)
+	accessTime = make(map[string]int)
+	accountsToExpire = make(map[int]map[string]bool)
+
 	coldReadCount = 0
 	hotTrieSize = 0
 	coldTrieSize = 0
 	lstBlock := -1
 
-	threshold := ctx.Int(recencyFlag.Name)
+	recency := ctx.Int(recencyFlag.Name)
+	frequency := ctx.Float64(frequencyFlag.Name)
 	gasSum := 0
 	txCount := 0
 	err := processTxFromZip(func(height int) error {
-		if err := encoldAccounts(height, threshold, hot, cold); err != nil {
+		if err := encoldAccounts(height); err != nil {
 			return err
 		}
 
 		if height/10000 != lstBlock/10000 {
-			println(height, coldReadCount, txCount)
+			println(height, coldReadCount, txCount, strconv.FormatFloat(float64(coldReadCount)/float64(txCount), 'f', -1, 64))
+			coldReadCount = 0
+			txCount = 0
 		}
 		lstBlock = height
-		coldReadCount = 0
-		txCount = 0
+
 		return nil
 	}, func(tx txFromZip) error {
 		gasSum += tx.gasUsed
 		txCount++
-		return updateWithTx(tx, hot, cold)
+		return updateWithTx(tx, recency, frequency)
 	}, prepareFiles(ctx)...)
 	if err != nil {
 		return err
