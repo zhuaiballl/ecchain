@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
@@ -28,7 +29,7 @@ func NewDbNode(ind int) (n *DbNode, err error) {
 	if err != nil {
 		return
 	}
-	//fmt.Println(datadir)
+	fmt.Println("Created a node, its datadir is:", datadir)
 	nodeConfig := &node.Config{
 		Name:    "geth-ec",
 		Version: params.Version,
