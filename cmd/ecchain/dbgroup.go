@@ -68,32 +68,6 @@ func (g *DbGroup) Clean() error {
 	return nil
 }
 
-var (
-	EcKFlag = &cli.IntFlag{
-		Name:  "k",
-		Usage: "EC group size is 2^k",
-		Value: 2,
-	}
-	ThresholdFlag = &cli.IntFlag{
-		Name:  "threshold",
-		Usage: "Threshold between cold/hot tries",
-		Value: 100,
-	}
-	MeasureTimeFlag = &cli.BoolFlag{
-		Name:  "time",
-		Usage: "Output time information",
-	}
-	MeasureStorageFlag = &cli.BoolFlag{
-		Name:  "storage",
-		Usage: "Output storage usage information",
-	}
-	IndFlag = &cli.IntFlag{
-		Name:  "ind",
-		Usage: "Designate the index of the ecnode in the ecgroup",
-		Value: 0,
-	}
-)
-
 var dbGroupCmd = &cli.Command{
 	Name:   "dbgroup",
 	Usage:  "Execute transactions with dbgroup",
@@ -104,13 +78,13 @@ var dbGroupCmd = &cli.Command{
 		ecKFlag,
 		measureTimeFlag,
 		measureStorageFlag,
-		IndFlag,
+		indFlag,
 	},
 	Description: "ecchain dbgroup /path/to/my.zip",
 }
 
 func dbGroup(ctx *cli.Context) error {
-	if ctx.IsSet(IndFlag.Name) {
+	if ctx.IsSet(indFlag.Name) {
 		return oneNodeFromDBGroup(ctx)
 	}
 
@@ -154,11 +128,11 @@ func dbGroup(ctx *cli.Context) error {
 }
 
 func oneNodeFromDBGroup(ctx *cli.Context) error {
-	measureTime := ctx.IsSet(MeasureTimeFlag.Name)
-	measureStorage := ctx.IsSet(MeasureStorageFlag.Name)
-	eck := ctx.Int(EcKFlag.Name)
+	measureTime := ctx.IsSet(measureTimeFlag.Name)
+	measureStorage := ctx.IsSet(measureStorageFlag.Name)
+	eck := ctx.Int(ecKFlag.Name)
 
-	n, err := NewDbNode(ctx.Int(IndFlag.Name))
+	n, err := NewDbNode(ctx.Int(indFlag.Name))
 	if err != nil {
 		return err
 	}

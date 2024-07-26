@@ -22,13 +22,18 @@ var (
 	}
 	recencyFlag = &cli.IntFlag{
 		Name:  "recency",
-		Usage: "Recency threshold between cold/hot tries",
+		Usage: "Recency recency between cold/hot tries",
 		Value: 10000,
 	}
 	frequencyFlag = &cli.Float64Flag{
 		Name:  "frequency",
-		Usage: "Frequency threshold between cold/hot tries",
+		Usage: "Frequency recency between cold/hot tries",
 		Value: 1,
+	}
+	indFlag = &cli.IntFlag{
+		Name:  "ind",
+		Usage: "Designate the index of the ecnode in the ecgroup",
+		Value: 0,
 	}
 	measureTimeFlag = &cli.BoolFlag{
 		Name:  "time",
