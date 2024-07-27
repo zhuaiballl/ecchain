@@ -7,13 +7,14 @@ import (
 
 type EcNode struct {
 	k         int
-	threshold int
+	recency   int
+	frequency float64
 	ind       int
 	hot       *DbNode
 	cold      *DbNode
 }
 
-func NewEcNode(k, threshold, ind int) (*EcNode, error) {
+func NewEcNode(k, recency int, frequency float64, ind int) (*EcNode, error) {
 	hot, err := NewDbNode(1)
 	if err != nil {
 		return nil, err
@@ -23,15 +24,15 @@ func NewEcNode(k, threshold, ind int) (*EcNode, error) {
 		return nil, err
 	}
 	return &EcNode{
-		k, threshold, ind,
+		k, recency, frequency, ind,
 		hot, cold,
 	}, nil
 }
 
-func NewEcNodes(k, threshold int) (nodes []*EcNode, err error) {
+func NewEcNodes(k, recency int, frequency float64) (nodes []*EcNode, err error) {
 	size := 1 << k
 	for i := 0; i < size; i++ {
-		newNode, nerr := NewEcNode(k, threshold, i)
+		newNode, nerr := NewEcNode(k, recency, frequency, i)
 		if nerr != nil {
 			err = nerr
 			return
