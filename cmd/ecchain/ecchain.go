@@ -3,32 +3,49 @@ package main
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/mpvl/unique"
 	"github.com/urfave/cli/v2"
+	"math"
 	"math/big"
 	"time"
 )
 
 type EcGroup struct {
-	k         int
-	size      int
-	threshold int
-	nodes     []*EcNode
-	metaNode  *EcNode
+	k                    int
+	size                 int
+	recency              int
+	frequency            float64
+	nodes                []*EcNode
+	blockToExpireNode    *DbNode
+	createdHeightNode    *DbNode
+	accessTimeNode       *DbNode
+	accountsToExpireNode *DbNode
 }
 
-func NewEcGroup(k, threshold int) (*EcGroup, error) {
+func NewEcGroup(k, recency int, frequency float64) (*EcGroup, error) {
 	g := &EcGroup{
 		k:         k,
-		size:      1 << k, // one extra node to maintain assist data
-		threshold: threshold,
+		size:      1 << k,
+		recency:   recency,
+		frequency: frequency,
 	}
 	var err error
-	g.nodes, err = NewEcNodes(k, threshold)
+	g.nodes, err = NewEcNodes(k, recency, frequency)
 	if err != nil {
 		return nil, err
 	}
-	g.metaNode, err = NewEcNode(k, threshold, g.size)
+	g.blockToExpireNode, err = NewDbNode(g.size)
+	if err != nil {
+		return nil, err
+	}
+	g.createdHeightNode, err = NewDbNode(g.size + 1)
+	if err != nil {
+		return nil, err
+	}
+	g.accessTimeNode, err = NewDbNode(g.size + 2)
+	if err != nil {
+		return nil, err
+	}
+	g.accountsToExpireNode, err = NewDbNode(g.size + 3)
 	if err != nil {
 		return nil, err
 	}
@@ -53,13 +70,13 @@ var accountCounts [][2]int
 
 func (g *EcGroup) executeTx(tx txFromZip) time.Duration {
 	timeBegin := time.Now()
+	accountsToExpire = make(map[int]map[string]bool)
 	for _, addrString := range []string{tx.sender, tx.to} {
 		addr := common.HexToAddress(addrString)
 		if g.IsHot(addr) { // the address exists and it's hot
 			for _, ecNode := range g.nodes {
 				ecNode.AddBalanceHot(addr, tx.value)
 			}
-			g.metaNode.SetBalance(addr, big.NewInt(int64(tx.blockNumber)))
 		} else {
 			if g.GetNodeForAddress(addr).cold.Exist(addr) { // the address exists and is cold, move it to hot
 				fmt.Println("cold")
@@ -75,18 +92,33 @@ func (g *EcGroup) executeTx(tx txFromZip) time.Duration {
 						ecNode.AddBalanceHot(addr, balance)
 					}(ecNode)
 				}
-				g.metaNode.SetBalance(addr, big.NewInt(int64(tx.blockNumber)))
 			} else { // the address doesn't exist, create it
 				for _, ecNode := range g.nodes {
 					func(ecNode *EcNode) {
 						ecNode.AddBalanceHot(addr, tx.value)
 					}(ecNode)
 				}
-				g.metaNode.SetBalance(addr, big.NewInt(int64(tx.blockNumber)))
-
 			}
 		}
-
+		if _, ok := accessTime[addrString]; !ok {
+			g.accessTimeNode.SetBalance(addr, big.NewInt(1))
+		} else {
+			g.accessTimeNode.AddBalance(addr, big.NewInt(1))
+			delete(accountsToExpire[int(g.blockToExpireNode.GetBalance(addr).Int64())], addrString)
+		}
+		newBlockToExpire := func(a, b int) int {
+			if a > b {
+				return a
+			}
+			return b
+		}(tx.blockNumber+g.recency, int(g.createdHeightNode.GetBalance(addr).Int64())+int(math.Ceil(float64(g.accessTimeNode.GetBalance(addr).Int64())/g.frequency)))
+		if newBlockToExpire < 4000000 {
+			g.blockToExpireNode.SetBalance(addr, big.NewInt(int64(newBlockToExpire)))
+			if _, ok := accountsToExpire[newBlockToExpire]; !ok {
+				accountsToExpire[newBlockToExpire] = make(map[string]bool)
+			}
+			accountsToExpire[newBlockToExpire][addrString] = true
+		}
 	}
 	timeSpent := time.Since(timeBegin)
 	return timeSpent
@@ -112,7 +144,16 @@ func (g *EcGroup) Clean() error {
 			return err
 		}
 	}
-	if err := g.metaNode.Clean(); err != nil {
+	if err := g.blockToExpireNode.Clean(); err != nil {
+		return err
+	}
+	if err := g.createdHeightNode.Clean(); err != nil {
+		return err
+	}
+	if err := g.accessTimeNode.Clean(); err != nil {
+		return err
+	}
+	if err := g.accountsToExpireNode.Clean(); err != nil {
 		return err
 	}
 	return nil
@@ -121,10 +162,11 @@ func (g *EcGroup) Clean() error {
 func ecchain(ctx *cli.Context) error {
 	measureTime := ctx.IsSet(measureTimeFlag.Name)
 	measureStorage := ctx.IsSet(measureStorageFlag.Name)
-	threshold := ctx.Int(recencyFlag.Name)
+	recency := ctx.Int(recencyFlag.Name)
+	frequency := ctx.Float64(frequencyFlag.Name)
 	debugging := ctx.IsSet(debugFlag.Name)
 
-	g, err := NewEcGroup(ctx.Int(ecKFlag.Name), threshold)
+	g, err := NewEcGroup(ctx.Int(ecKFlag.Name), recency, frequency)
 	if err != nil {
 		return err
 	}
@@ -151,40 +193,19 @@ func ecchain(ctx *cli.Context) error {
 		txCount = 0
 
 		// colding
-		coldHeight := height - threshold
-		for len(accountCounts) > 0 && accountCounts[0][0] <= coldHeight {
-			//fmt.Println("colding", accountCounts[0][0])
-			coldAddress := common.BigToAddress(big.NewInt(int64(accountCounts[0][0]))) // coldAddress is the address that stores accounts in the block[coldHeight]
-			for i := 0; i < accountCounts[0][1]; i++ {
-				account := common.HexToAddress(g.metaNode.hot.stateDb.GetState(coldAddress, common.BigToHash(big.NewInt(int64(i)))).Hex())
-				//fmt.Println("Is", g.metaNode.hot.stateDb.GetState(coldAddress, common.BigToHash(big.NewInt(int64(i)))), "colding?")
-				//fmt.Println("Is", coldAddress, common.BigToHash(big.NewInt(int64(i))), "colding?")
-				if g.metaNode.hot.GetBalance(account).Int64() <= int64(coldHeight) {
-					//fmt.Println("Colding", account)
-					// remove addr from hot
-					balance := g.nodes[0].hot.stateDb.GetBalance(account)
-					for _, ecNode := range g.nodes {
-						ecNode.hot.Delete(account)
-					}
-
-					// add addr to cold
-					g.GetNodeForAddress(account).SetBalanceCold(account, balance)
-				}
+		for addrString := range accountsToExpire[height] {
+			addr := common.HexToAddress(addrString)
+			//fmt.Println("Colding", account)
+			// remove addr from hot
+			balance := g.nodes[0].hot.stateDb.GetBalance(addr)
+			for _, ecNode := range g.nodes {
+				ecNode.hot.Delete(addr)
 			}
-			accountCounts = accountCounts[1:]
-			g.nodes[0].hot.Delete(coldAddress)
+
+			// add addr to cold
+			g.GetNodeForAddress(addr).SetBalanceCold(addr, balance)
 		}
-
-		// write accountsInCurrentBlock into metaNode
-		unique.Strings(&accountsInCurrentBlock)
-		heightAddress := common.BigToAddress(big.NewInt(int64(height)))
-		for i, account := range accountsInCurrentBlock {
-			g.metaNode.hot.stateDb.SetState(heightAddress, common.BigToHash(big.NewInt(int64(i))), common.HexToHash(account))
-
-		}
-		accountCounts = append(accountCounts, [2]int{height, len(accountsInCurrentBlock)})
-
-		accountsInCurrentBlock = []string{}
+		delete(accountsToExpire, height)
 
 		if err = g.Commit(height, measureStorage, measureTime); err != nil {
 			return err
