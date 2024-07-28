@@ -134,6 +134,19 @@ func (g *EcGroup) Commit(height int, measureStorage, measureTime bool) error {
 	//if err != nil {
 	//	return err
 	//}
+	err := g.createdHeightNode.Commit()
+	if err != nil {
+		return err
+	}
+	err = g.blockToExpireNode.Commit()
+	if err != nil {
+		return err
+	}
+	err = g.accessTimeNode.Commit()
+	if err != nil {
+		return err
+	}
+	err = g.accountsToExpireNode.Commit()
 	return nil
 }
 
